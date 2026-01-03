@@ -12,7 +12,7 @@ class Particle {
   update() {
     // Euler integration
     this.velocity.add(this.acceleration);
-    this.velocity.limit(MAX_SPEED);
+    this.velocity.limit(config.maxSpeed);
     this.position.add(this.velocity);
     
     // Reset acceleration
@@ -35,7 +35,8 @@ class Particle {
   }
 
   show() {
-    // Minimal rendering: point
+    // Minimal rendering: point with configurable size
+    strokeWeight(graphics.particleSize);
     point(this.position.x, this.position.y);
   }
 }

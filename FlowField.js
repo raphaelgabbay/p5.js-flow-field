@@ -1,9 +1,9 @@
 class FlowField {
   constructor() {
-    this.noiseScale = NOISE_SCALE;
-    this.forceStrength = FORCE_STRENGTH;
+    this.noiseScale = config.noiseScale;
+    this.forceStrength = config.forceStrength;
     this.time = 0;
-    this.timeIncrement = TIME_INCREMENT;
+    this.timeIncrement = config.timeIncrement;
   }
 
   getForceAt(x, y) {
