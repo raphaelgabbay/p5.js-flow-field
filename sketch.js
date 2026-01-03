@@ -29,20 +29,14 @@ const settings = {
   guiOpacity: 0.8
 };
 
-// Tool configuration
-const tools = {
-  currentTool: 'spawn', // 'spawn', 'attract'
-  attractStrength: 5,
-  attractRadius: 200
-};
-
 let world;
 let gui;
 let particleCountController;
 let presetsFolder;
 let presetLoadController;
 let presetNameInput = { name: 'Preset 1' };
-let toolSelectorController;
+let toolManager;
+let uiManager;
 
 // Preset management
 const PresetManager = {
@@ -60,12 +54,25 @@ const PresetManager = {
   
   savePreset: (name) => {
     const presets = PresetManager.getAllPresets();
+    
+    // Save tool parameters from ToolManager
+    const toolParams = {};
+    if (toolManager) {
+      const activeTool = toolManager.getActive();
+      if (activeTool && activeTool.params) {
+        Object.keys(activeTool.params).forEach(paramName => {
+          toolParams[paramName] = activeTool.getParam(paramName);
+        });
+      }
+      toolParams.currentTool = toolManager.getActiveId();
+    }
+    
     presets[name] = {
       config: { ...config },
       graphics: { ...graphics },
       sizeNoise: { ...sizeNoise },
       settings: { ...settings },
-      tools: { ...tools },
+      tools: toolParams,
       timestamp: new Date().toISOString()
     };
     // Remove currentParticleCount from saved config
@@ -121,18 +128,25 @@ const PresetManager = {
       }
       
       // Load tools (if present)
-      if (preset.tools) {
-        Object.keys(preset.tools).forEach(key => {
-          if (tools.hasOwnProperty(key)) {
-            tools[key] = preset.tools[key];
-          }
-        });
-        // Update tool selector UI if it exists
-        if (typeof window.updateToolSelectorUI === 'function') {
-          window.updateToolSelectorUI();
+      if (preset.tools && toolManager) {
+        // Set active tool
+        if (preset.tools.currentTool) {
+          toolManager.setActive(preset.tools.currentTool);
         }
-        if (toolSelectorController) {
-          toolSelectorController.setValue(tools.currentTool);
+        
+        // Load tool parameters
+        const activeTool = toolManager.getActive();
+        if (activeTool && activeTool.params) {
+          Object.keys(preset.tools).forEach(key => {
+            if (key !== 'currentTool' && activeTool.params[key]) {
+              activeTool.setParam(key, preset.tools[key]);
+              // Update GUI controller if it exists
+              const controllers = toolManager.paramControllers.get(activeTool.id);
+              if (controllers && controllers.has(key)) {
+                controllers.get(key).setValue(preset.tools[key]);
+              }
+            }
+          });
         }
       }
       
@@ -285,6 +299,14 @@ async function setup() {
   // Create fullscreen canvas
   createCanvas(windowWidth, windowHeight);
   
+  // Set background color to black
+  background(0);
+
+  // Prevent context menu on right click
+  document.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+  });
+  
   // Initialize world
   world = new World();
   
@@ -296,6 +318,11 @@ async function setup() {
   
   // Setup lil-gui
   gui = new lil.GUI();
+  // Store reference to GUI for Dock toggle (set early so it's always available)
+  window.particleEngineGUI = gui;
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/527a21af-eea1-4d95-9dc3-a47f1486fd47',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'sketch.js:318',message:'GUI stored in window.particleEngineGUI (early)',data:{guiExists:gui !== null && gui !== undefined,hasDomElement:gui && gui.domElement !== null && gui.domElement !== undefined},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+  // #endregion
   const initialParticlesController = gui.add(config, 'particleCount', 0, 10000).name('Initial Particles');
   initialParticlesController.onFinishChange(() => {
     // Recreate world when Initial Particles slider is released
@@ -312,7 +339,7 @@ async function setup() {
     }
   });
   gui.add(config, 'maxSpeed', 0.1, 15).name('Max Speed');
-  gui.add(config, 'noiseScale', -0.1, 20).name('Noise Scale');
+  gui.add(config, 'noiseScale', -0.1, 1).name('Noise Scale');
   gui.add(config, 'forceStrength', -1, 100).name('Force Strength');
   gui.add(config, 'timeIncrement', -0.1, 0.1).name('Time Increment');
   gui.add(config, 'noiseSpeed', -5, 5).name('Noise Speed');
@@ -327,103 +354,43 @@ async function setup() {
   // Initialize particle count
   updateParticleCount();
   
-  // Graphics folder
+  // Graphics folder (closed by default)
   const graphicsFolder = gui.addFolder('Graphics');
-  graphicsFolder.add(graphics, 'particleSize', 0.5, 300).name('Particle Size');
+  graphicsFolder.close(); // Close by default
+  graphicsFolder.add(graphics, 'particleSize', 0.5, 30).name('Particle Size');
   graphicsFolder.add(graphics, 'sizeModifierStrength', 1, 100).name('Size Modifier Strength');
   graphicsFolder.add({ capture: () => {
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
     saveCanvas(`particle-engine-${timestamp}`, 'png');
   }}, 'capture').name('Capture Frame');
   
-  // Size Noise folder (separate from movement noise)
+  // Size Noise folder (closed by default)
   const sizeNoiseFolder = gui.addFolder('Size Noise');
+  sizeNoiseFolder.close(); // Close by default
   sizeNoiseFolder.add(sizeNoise, 'noiseScale', 0, 5).name('Noise Scale');
   sizeNoiseFolder.add(sizeNoise, 'timeIncrement', -0.1, 10).name('Time Increment');
   sizeNoiseFolder.add(sizeNoise, 'timeOffset', -10, 10).name('Time Offset');
   
-  // Tools folder
-  const toolsFolder = gui.addFolder('Tools');
+  // Initialize ToolManager
+  toolManager = new ToolManager();
   
-  // Create tool selector with icons
-  const toolOptions = {
-    'spawn': 'Spawn Particles',
-    'attract': 'Attract/Repulse'
-  };
+  // Register tools
+  toolManager.register(new SpawnTool());
+  toolManager.register(new AttractRepulseTool());
   
-  toolSelectorController = toolsFolder.add(tools, 'currentTool', Object.keys(toolOptions))
-    .name('Tool')
-    .onChange((value) => {
-      updateToolSelectorUI();
-    });
+  // Set default active tool
+  toolManager.setActive('spawn');
   
-  // Add custom HTML for tool icons
-  const toolSelectorElement = toolSelectorController.domElement;
-  const toolSelectorContainer = document.createElement('div');
-  toolSelectorContainer.style.display = 'flex';
-  toolSelectorContainer.style.gap = '8px';
-  toolSelectorContainer.style.marginTop = '8px';
-  toolSelectorContainer.style.flexWrap = 'wrap';
+  // Initialize Dock UI
+  uiManager = new UIManager(toolManager);
+  uiManager.init();
   
-  Object.keys(toolOptions).forEach(toolKey => {
-    const toolButton = document.createElement('button');
-    toolButton.style.cssText = `
-      padding: 8px 12px;
-      border: 2px solid #333;
-      background: ${tools.currentTool === toolKey ? '#4a9eff' : '#222'};
-      color: white;
-      cursor: pointer;
-      border-radius: 4px;
-      font-size: 12px;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      transition: all 0.2s;
-    `;
-    
-    // Add icon (using Unicode symbols)
-    const icon = document.createElement('span');
-    icon.textContent = toolKey === 'spawn' ? '✨' : '🧲';
-    icon.style.fontSize = '16px';
-    
-    const label = document.createElement('span');
-    label.textContent = toolOptions[toolKey];
-    
-    toolButton.appendChild(icon);
-    toolButton.appendChild(label);
-    
-    toolButton.addEventListener('click', () => {
-      tools.currentTool = toolKey;
-      toolSelectorController.setValue(toolKey);
-      updateToolSelectorUI();
-    });
-    
-    toolButton.dataset.tool = toolKey;
-    toolSelectorContainer.appendChild(toolButton);
-  });
+  // Setup GUI for tools (creates Tool Parameters folder directly)
+  toolManager.setupGUI(gui);
   
-  toolSelectorElement.appendChild(toolSelectorContainer);
-  
-  // Function to update tool selector UI
-  window.updateToolSelectorUI = function() {
-    const buttons = toolSelectorContainer.querySelectorAll('button');
-    buttons.forEach(btn => {
-      if (btn.dataset.tool === tools.currentTool) {
-        btn.style.background = '#4a9eff';
-        btn.style.borderColor = '#6bb0ff';
-      } else {
-        btn.style.background = '#222';
-        btn.style.borderColor = '#333';
-      }
-    });
-  };
-  
-  // Attract tool settings
-  toolsFolder.add(tools, 'attractStrength', 0.1, 20).name('Attract Strength');
-  toolsFolder.add(tools, 'attractRadius', 10, 500).name('Attract Radius');
-  
-  // Settings folder
+  // Settings folder (closed by default)
   const settingsFolder = gui.addFolder('Settings');
+  settingsFolder.close(); // Close by default
   settingsFolder.add(settings, 'guiOpacity', 0.1, 1).name('GUI Opacity')
     .onChange((value) => {
       if (gui && gui.domElement) {
@@ -488,6 +455,11 @@ async function setup() {
   // Initialize preset list
   PresetManager.updatePresetList();
   
+  // Hide GUI by default
+  if (gui && gui.domElement) {
+    gui.domElement.style.display = 'none';
+  }
+  
   // Update flow field when relevant parameters change
   gui.onChange(() => {
     if (world && world.flowField) {
@@ -516,21 +488,6 @@ function updateParticleCount() {
 function draw() {
   background(0,20);
   
-  // Handle tool interactions
-  if (tools.currentTool === 'spawn') {
-    // Generate particles at mouse position when left mouse button is held
-    if (mouseIsPressed && mouseButton === LEFT) {
-      for (let i = 0; i < config.particlesPerFrame; i++) {
-        world.addParticle(mouseX, mouseY);
-      }
-    }
-  } else if (tools.currentTool === 'attract') {
-    // Attract/repulse particles when mouse is pressed
-    if (mouseIsPressed) {
-      world.applyAttractRepulse(mouseX, mouseY, mouseButton === LEFT);
-    }
-  }
-  
   // Update current particle count for display
   updateParticleCount();
   
@@ -538,16 +495,61 @@ function draw() {
   world.update();
   world.render();
   
-  // Draw tool indicator
-  if (tools.currentTool === 'attract' && mouseIsPressed) {
-    push();
-    noFill();
-    stroke(255, 100);
-    strokeWeight(2);
-    const alpha = mouseButton === LEFT ? 100 : 200;
-    stroke(100, 150, 255, alpha);
-    circle(mouseX, mouseY, tools.attractRadius * 2);
-    pop();
+  // Update and render active tool
+  if (toolManager) {
+    toolManager.update(world);
+    toolManager.render();
+  }
+}
+
+function mousePressed() {
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/527a21af-eea1-4d95-9dc3-a47f1486fd47',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'sketch.js:495',message:'p5 mousePressed called',data:{mouseX:mouseX,mouseY:mouseY,button:mouseButton},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+  // #endregion
+  
+  // Hide parameters panel when clicking on canvas
+  if (window.parametersPanel) {
+    window.parametersPanel.hide();
+  }
+  
+  if (toolManager) {
+    toolManager.handleMousePressed(world, {
+      x: mouseX,
+      y: mouseY,
+      button: mouseButton
+    });
+  }
+}
+
+function mouseDragged() {
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/527a21af-eea1-4d95-9dc3-a47f1486fd47',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'sketch.js:505',message:'p5 mouseDragged called',data:{mouseX:mouseX,mouseY:mouseY,button:mouseButton},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+  // #endregion
+  if (toolManager) {
+    toolManager.handleMouseDragged(world, {
+      x: mouseX,
+      y: mouseY,
+      button: mouseButton
+    });
+  }
+}
+
+function mouseReleased() {
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/527a21af-eea1-4d95-9dc3-a47f1486fd47',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'sketch.js:515',message:'p5 mouseReleased called',data:{mouseX:mouseX,mouseY:mouseY,button:mouseButton},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+  // #endregion
+  if (toolManager) {
+    toolManager.handleMouseReleased(world, {
+      x: mouseX,
+      y: mouseY,
+      button: mouseButton
+    });
+  }
+}
+
+function keyPressed() {
+  if (toolManager) {
+    toolManager.handleKeyPressed(key);
   }
 }
 

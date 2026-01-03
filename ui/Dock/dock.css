@@ -1,0 +1,238 @@
+/**
+ * Dock and Parameters Panel Styles
+ * macOS-inspired design with glassmorphism
+ */
+
+/* Dock Container */
+#tool-dock {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  pointer-events: none;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+#tool-dock.hidden {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-50%) translateY(20px);
+}
+
+#tool-dock .dock-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 20px;
+  background: rgba(30, 30, 30, 0.7);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-radius: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  pointer-events: auto;
+}
+
+/* Dock Items (Icons) */
+.dock-item {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.05);
+  border: 2px solid transparent;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  padding: 0;
+  margin: 0;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.dock-item:hover {
+  background: rgba(255, 255, 255, 0.1);
+  transform: scale(1.15) translateY(-4px);
+  color: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.dock-item.active {
+  background: rgba(74, 158, 255, 0.3);
+  border-color: rgba(74, 158, 255, 0.6);
+  color: rgba(255, 255, 255, 1);
+  transform: scale(1.1);
+  box-shadow: 0 0 16px rgba(74, 158, 255, 0.4);
+}
+
+.dock-item.active:hover {
+  transform: scale(1.2) translateY(-4px);
+  box-shadow: 0 0 20px rgba(74, 158, 255, 0.6);
+}
+
+.dock-item i {
+  width: 24px;
+  height: 24px;
+  stroke-width: 2;
+}
+
+.dock-item:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(74, 158, 255, 0.5);
+}
+
+
+/* Parameters Panel */
+#parameters-panel {
+  position: fixed;
+  bottom: 90px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 999;
+  pointer-events: none;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+#parameters-panel .panel-container {
+  background: rgba(30, 30, 30, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  min-width: 280px;
+  max-width: 400px;
+  pointer-events: auto;
+  overflow: hidden;
+}
+
+#parameters-panel .panel-header {
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.2);
+}
+
+#parameters-panel .panel-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+#parameters-panel .panel-content {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+#parameters-panel .param-control {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+#parameters-panel .param-label {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.7);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-weight: 500;
+}
+
+#parameters-panel .param-input-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+#parameters-panel .param-slider {
+  flex: 1;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.1);
+  outline: none;
+  -webkit-appearance: none;
+  appearance: none;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+#parameters-panel .param-slider:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+#parameters-panel .param-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: rgba(74, 158, 255, 0.8);
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+#parameters-panel .param-slider::-webkit-slider-thumb:hover {
+  background: rgba(74, 158, 255, 1);
+  transform: scale(1.1);
+  box-shadow: 0 2px 8px rgba(74, 158, 255, 0.4);
+}
+
+#parameters-panel .param-slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: rgba(74, 158, 255, 0.8);
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+#parameters-panel .param-slider::-moz-range-thumb:hover {
+  background: rgba(74, 158, 255, 1);
+  transform: scale(1.1);
+  box-shadow: 0 2px 8px rgba(74, 158, 255, 0.4);
+}
+
+#parameters-panel .param-value {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.8);
+  font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
+  min-width: 50px;
+  text-align: right;
+  font-weight: 500;
+}
+
+/* Hide panel when empty */
+#parameters-panel:empty {
+  display: none;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  #tool-dock .dock-container {
+    padding: 10px 16px;
+    gap: 6px;
+  }
+  
+  .dock-item {
+    width: 44px;
+    height: 44px;
+  }
+  
+  .dock-item i {
+    width: 20px;
+    height: 20px;
+  }
+  
+  #parameters-panel .panel-container {
+    min-width: 240px;
+    max-width: 90vw;
+  }
+}
+
