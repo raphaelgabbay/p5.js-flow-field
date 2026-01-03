@@ -299,6 +299,9 @@ async function setup() {
   // Create fullscreen canvas
   createCanvas(windowWidth, windowHeight);
   
+  // Set background color to black
+  background(0);
+
   // Prevent context menu on right click
   document.addEventListener('contextmenu', (e) => {
     e.preventDefault();
@@ -336,7 +339,7 @@ async function setup() {
     }
   });
   gui.add(config, 'maxSpeed', 0.1, 15).name('Max Speed');
-  gui.add(config, 'noiseScale', -0.1, 20).name('Noise Scale');
+  gui.add(config, 'noiseScale', -0.1, 1).name('Noise Scale');
   gui.add(config, 'forceStrength', -1, 100).name('Force Strength');
   gui.add(config, 'timeIncrement', -0.1, 0.1).name('Time Increment');
   gui.add(config, 'noiseSpeed', -5, 5).name('Noise Speed');
@@ -354,7 +357,7 @@ async function setup() {
   // Graphics folder (closed by default)
   const graphicsFolder = gui.addFolder('Graphics');
   graphicsFolder.close(); // Close by default
-  graphicsFolder.add(graphics, 'particleSize', 0.5, 300).name('Particle Size');
+  graphicsFolder.add(graphics, 'particleSize', 0.5, 30).name('Particle Size');
   graphicsFolder.add(graphics, 'sizeModifierStrength', 1, 100).name('Size Modifier Strength');
   graphicsFolder.add({ capture: () => {
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
