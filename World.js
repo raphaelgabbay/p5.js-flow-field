@@ -49,6 +49,35 @@ class World {
     }
   }
   
+  applyAttractRepulse(x, y, isAttract) {
+    // Apply attract or repulse force to particles within radius
+    const mousePos = createVector(x, y);
+    const radius = tools.attractRadius;
+    const strength = tools.attractStrength;
+    
+    for (let particle of this.particles) {
+      const distance = p5.Vector.dist(mousePos, particle.position);
+      
+      if (distance < radius && distance > 0) {
+        // Calculate force direction
+        const force = p5.Vector.sub(mousePos, particle.position);
+        force.normalize();
+        
+        // Apply strength based on distance (stronger when closer)
+        const distanceFactor = 1 - (distance / radius);
+        const forceMagnitude = strength * distanceFactor;
+        
+        // Reverse direction for repulse
+        if (!isAttract) {
+          force.mult(-1);
+        }
+        
+        force.mult(forceMagnitude);
+        particle.applyForce(force);
+      }
+    }
+  }
+  
   getParticleCount() {
     return this.particles.length;
   }

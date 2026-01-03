@@ -29,12 +29,20 @@ const settings = {
   guiOpacity: 0.8
 };
 
+// Tool configuration
+const tools = {
+  currentTool: 'spawn', // 'spawn', 'attract'
+  attractStrength: 5,
+  attractRadius: 200
+};
+
 let world;
 let gui;
 let particleCountController;
 let presetsFolder;
 let presetLoadController;
 let presetNameInput = { name: 'Preset 1' };
+let toolSelectorController;
 
 // Preset management
 const PresetManager = {
@@ -57,6 +65,7 @@ const PresetManager = {
       graphics: { ...graphics },
       sizeNoise: { ...sizeNoise },
       settings: { ...settings },
+      tools: { ...tools },
       timestamp: new Date().toISOString()
     };
     // Remove currentParticleCount from saved config
@@ -108,6 +117,22 @@ const PresetManager = {
         // Apply GUI opacity
         if (gui && gui.domElement) {
           gui.domElement.style.opacity = settings.guiOpacity;
+        }
+      }
+      
+      // Load tools (if present)
+      if (preset.tools) {
+        Object.keys(preset.tools).forEach(key => {
+          if (tools.hasOwnProperty(key)) {
+            tools[key] = preset.tools[key];
+          }
+        });
+        // Update tool selector UI if it exists
+        if (typeof window.updateToolSelectorUI === 'function') {
+          window.updateToolSelectorUI();
+        }
+        if (toolSelectorController) {
+          toolSelectorController.setValue(tools.currentTool);
         }
       }
       
@@ -180,10 +205,83 @@ const PresetManager = {
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
+  },
+  
+  importFromJSON: (jsonData) => {
+    try {
+      let importedPresets = {};
+      
+      // Check if it's a single preset or a collection
+      if (jsonData.config && jsonData.graphics) {
+        // Single preset format - need to generate a name
+        const timestamp = new Date().toISOString();
+        const presetName = jsonData.name || `Imported-${timestamp.split('T')[0]}`;
+        importedPresets[presetName] = jsonData;
+      } else {
+        // Collection format - object with preset names as keys
+        importedPresets = jsonData;
+      }
+      
+      // Merge with existing presets (imported presets will overwrite if names match)
+      const existingPresets = PresetManager.getAllPresets();
+      const mergedPresets = { ...existingPresets, ...importedPresets };
+      
+      // Save merged presets
+      localStorage.setItem(PresetManager.getStorageKey(), JSON.stringify(mergedPresets));
+      PresetManager.updatePresetList();
+      
+      const count = Object.keys(importedPresets).length;
+      console.log(`Successfully imported ${count} preset(s)`);
+      return { success: true, count: count };
+    } catch (e) {
+      console.error('Error importing presets:', e);
+      alert('Error importing presets: ' + e.message);
+      return { success: false, error: e.message };
+    }
+  },
+  
+  handleFileImport: (file) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const jsonData = JSON.parse(e.target.result);
+        const result = PresetManager.importFromJSON(jsonData);
+        if (result.success) {
+          alert(`Successfully imported ${result.count} preset(s)!`);
+        }
+      } catch (e) {
+        alert('Error parsing JSON file: ' + e.message);
+      }
+    };
+    reader.onerror = () => {
+      alert('Error reading file');
+    };
+    reader.readAsText(file);
+  },
+  
+  loadPresetsFromFile: async () => {
+    try {
+      const response = await fetch('presets.json');
+      if (!response.ok) {
+        // File doesn't exist or can't be read - this is fine, just return
+        console.log('presets.json not found - skipping auto-load');
+        return { success: false, error: 'File not found' };
+      }
+      const jsonData = await response.json();
+      const result = PresetManager.importFromJSON(jsonData);
+      if (result.success) {
+        console.log(`Auto-loaded ${result.count} preset(s) from presets.json`);
+      }
+      return result;
+    } catch (e) {
+      // Silently fail if file doesn't exist or can't be loaded
+      console.log('Could not load presets.json:', e.message);
+      return { success: false, error: e.message };
+    }
   }
 };
 
-function setup() {
+async function setup() {
   // Create fullscreen canvas
   createCanvas(windowWidth, windowHeight);
   
@@ -192,6 +290,9 @@ function setup() {
   
   // Minimal styling
   stroke(255);
+  
+  // Load presets from presets.json if it exists
+  await PresetManager.loadPresetsFromFile();
   
   // Setup lil-gui
   gui = new lil.GUI();
@@ -210,9 +311,9 @@ function setup() {
       updateParticleCount();
     }
   });
-  gui.add(config, 'maxSpeed', 0.1, 10).name('Max Speed');
-  gui.add(config, 'noiseScale', -0.1, 5).name('Noise Scale');
-  gui.add(config, 'forceStrength', -1, 1).name('Force Strength');
+  gui.add(config, 'maxSpeed', 0.1, 15).name('Max Speed');
+  gui.add(config, 'noiseScale', -0.1, 20).name('Noise Scale');
+  gui.add(config, 'forceStrength', -1, 100).name('Force Strength');
   gui.add(config, 'timeIncrement', -0.1, 0.1).name('Time Increment');
   gui.add(config, 'noiseSpeed', -5, 5).name('Noise Speed');
   gui.add(config, 'particlesPerFrame', 1, 50).name('Particles Per Frame');
@@ -240,6 +341,86 @@ function setup() {
   sizeNoiseFolder.add(sizeNoise, 'noiseScale', 0, 5).name('Noise Scale');
   sizeNoiseFolder.add(sizeNoise, 'timeIncrement', -0.1, 10).name('Time Increment');
   sizeNoiseFolder.add(sizeNoise, 'timeOffset', -10, 10).name('Time Offset');
+  
+  // Tools folder
+  const toolsFolder = gui.addFolder('Tools');
+  
+  // Create tool selector with icons
+  const toolOptions = {
+    'spawn': 'Spawn Particles',
+    'attract': 'Attract/Repulse'
+  };
+  
+  toolSelectorController = toolsFolder.add(tools, 'currentTool', Object.keys(toolOptions))
+    .name('Tool')
+    .onChange((value) => {
+      updateToolSelectorUI();
+    });
+  
+  // Add custom HTML for tool icons
+  const toolSelectorElement = toolSelectorController.domElement;
+  const toolSelectorContainer = document.createElement('div');
+  toolSelectorContainer.style.display = 'flex';
+  toolSelectorContainer.style.gap = '8px';
+  toolSelectorContainer.style.marginTop = '8px';
+  toolSelectorContainer.style.flexWrap = 'wrap';
+  
+  Object.keys(toolOptions).forEach(toolKey => {
+    const toolButton = document.createElement('button');
+    toolButton.style.cssText = `
+      padding: 8px 12px;
+      border: 2px solid #333;
+      background: ${tools.currentTool === toolKey ? '#4a9eff' : '#222'};
+      color: white;
+      cursor: pointer;
+      border-radius: 4px;
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+    `;
+    
+    // Add icon (using Unicode symbols)
+    const icon = document.createElement('span');
+    icon.textContent = toolKey === 'spawn' ? '✨' : '🧲';
+    icon.style.fontSize = '16px';
+    
+    const label = document.createElement('span');
+    label.textContent = toolOptions[toolKey];
+    
+    toolButton.appendChild(icon);
+    toolButton.appendChild(label);
+    
+    toolButton.addEventListener('click', () => {
+      tools.currentTool = toolKey;
+      toolSelectorController.setValue(toolKey);
+      updateToolSelectorUI();
+    });
+    
+    toolButton.dataset.tool = toolKey;
+    toolSelectorContainer.appendChild(toolButton);
+  });
+  
+  toolSelectorElement.appendChild(toolSelectorContainer);
+  
+  // Function to update tool selector UI
+  window.updateToolSelectorUI = function() {
+    const buttons = toolSelectorContainer.querySelectorAll('button');
+    buttons.forEach(btn => {
+      if (btn.dataset.tool === tools.currentTool) {
+        btn.style.background = '#4a9eff';
+        btn.style.borderColor = '#6bb0ff';
+      } else {
+        btn.style.background = '#222';
+        btn.style.borderColor = '#333';
+      }
+    });
+  };
+  
+  // Attract tool settings
+  toolsFolder.add(tools, 'attractStrength', 0.1, 20).name('Attract Strength');
+  toolsFolder.add(tools, 'attractRadius', 10, 500).name('Attract Radius');
   
   // Settings folder
   const settingsFolder = gui.addFolder('Settings');
@@ -284,7 +465,25 @@ function setup() {
     }
   }}, 'deleteCurrent').name('Delete Current');
   
-  presetsFolder.add({ exportJSON: () => PresetManager.exportAsJSON() }, 'exportJSON').name('Download as JSON');
+  presetsFolder.add({ exportJSON: () => PresetManager.exportAsJSON() }, 'exportJSON').name('Download All Presets');
+  
+  // File input for importing presets
+  const fileInput = document.createElement('input');
+  fileInput.type = 'file';
+  fileInput.accept = '.json';
+  fileInput.style.display = 'none';
+  fileInput.addEventListener('change', (e) => {
+    if (e.target.files && e.target.files[0]) {
+      PresetManager.handleFileImport(e.target.files[0]);
+      // Reset input so same file can be selected again
+      fileInput.value = '';
+    }
+  });
+  document.body.appendChild(fileInput);
+  
+  presetsFolder.add({ importJSON: () => {
+    fileInput.click();
+  }}, 'importJSON').name('Import Presets (JSON)');
   
   // Initialize preset list
   PresetManager.updatePresetList();
@@ -317,10 +516,18 @@ function updateParticleCount() {
 function draw() {
   background(0,20);
   
-  // Generate particles at mouse position when left mouse button is held
-  if (mouseIsPressed && mouseButton === LEFT) {
-    for (let i = 0; i < config.particlesPerFrame; i++) {
-      world.addParticle(mouseX, mouseY);
+  // Handle tool interactions
+  if (tools.currentTool === 'spawn') {
+    // Generate particles at mouse position when left mouse button is held
+    if (mouseIsPressed && mouseButton === LEFT) {
+      for (let i = 0; i < config.particlesPerFrame; i++) {
+        world.addParticle(mouseX, mouseY);
+      }
+    }
+  } else if (tools.currentTool === 'attract') {
+    // Attract/repulse particles when mouse is pressed
+    if (mouseIsPressed) {
+      world.applyAttractRepulse(mouseX, mouseY, mouseButton === LEFT);
     }
   }
   
@@ -330,6 +537,18 @@ function draw() {
   // Update and render world
   world.update();
   world.render();
+  
+  // Draw tool indicator
+  if (tools.currentTool === 'attract' && mouseIsPressed) {
+    push();
+    noFill();
+    stroke(255, 100);
+    strokeWeight(2);
+    const alpha = mouseButton === LEFT ? 100 : 200;
+    stroke(100, 150, 255, alpha);
+    circle(mouseX, mouseY, tools.attractRadius * 2);
+    pop();
+  }
 }
 
 function windowResized() {

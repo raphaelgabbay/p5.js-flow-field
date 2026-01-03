@@ -1,0 +1,52 @@
+{
+  "Speed": {
+    "config": {
+      "particleCount": 2380,
+      "maxParticles": 8020.2,
+      "maxSpeed": 9.6337,
+      "noiseScale": 0.0852,
+      "forceStrength": 1,
+      "timeIncrement": 0.0878,
+      "noiseSpeed": 1,
+      "particlesPerFrame": 5
+    },
+    "graphics": {
+      "particleSize": 16.3735,
+      "sizeModifierStrength": 0.5
+    },
+    "sizeNoise": {
+      "noiseScale": 1.065,
+      "timeIncrement": 9.8788,
+      "timeOffset": 0
+    },
+    "settings": {
+      "guiOpacity": 0.8
+    },
+    "timestamp": "2026-01-03T21:14:16.518Z"
+  },
+  "Pulse": {
+    "config": {
+      "particleCount": 2380,
+      "maxParticles": 8020.2,
+      "maxSpeed": 2.9413,
+      "noiseScale": 5,
+      "forceStrength": 1,
+      "timeIncrement": 0.0878,
+      "noiseSpeed": 1,
+      "particlesPerFrame": 5
+    },
+    "graphics": {
+      "particleSize": 1.698,
+      "sizeModifierStrength": 23.275
+    },
+    "sizeNoise": {
+      "noiseScale": 0,
+      "timeIncrement": -0.1,
+      "timeOffset": -5.74
+    },
+    "settings": {
+      "guiOpacity": 0.8
+    },
+    "timestamp": "2026-01-03T21:17:16.899Z"
+  }
+}
