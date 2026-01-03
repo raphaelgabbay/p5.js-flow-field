@@ -3,6 +3,7 @@ class Particle {
     this.position = createVector(x, y);
     this.velocity = createVector(0, 0);
     this.acceleration = createVector(0, 0);
+    this.sizeModifier = 1; // Default size modifier
   }
 
   applyForce(force) {
@@ -35,8 +36,10 @@ class Particle {
   }
 
   show() {
-    // Minimal rendering: point with configurable size
-    strokeWeight(graphics.particleSize);
+    // Minimal rendering: point with configurable size and noise-based modifier
+    const baseSize = graphics.particleSize;
+    const modifiedSize = baseSize * (1 + (this.sizeModifier - 0.5) * graphics.sizeModifierStrength);
+    strokeWeight(modifiedSize);
     point(this.position.x, this.position.y);
   }
 }

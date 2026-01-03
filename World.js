@@ -17,14 +17,17 @@ class World {
     
     // Update all particles
     for (let particle of this.particles) {
-      // Get force from flow field at particle position
-      const force = this.flowField.getForceAt(
+      // Get force and size modifier from 4D flow field at particle position
+      const result = this.flowField.getForceAndSizeModifierAt(
         particle.position.x,
         particle.position.y
       );
       
       // Apply force to particle
-      particle.applyForce(force);
+      particle.applyForce(result.force);
+      
+      // Update size modifier from 4D noise
+      particle.sizeModifier = result.sizeModifier;
       
       // Update particle physics
       particle.update();
