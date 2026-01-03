@@ -1,0 +1,41 @@
+class Particle {
+  constructor(x, y) {
+    this.position = createVector(x, y);
+    this.velocity = createVector(0, 0);
+    this.acceleration = createVector(0, 0);
+  }
+
+  applyForce(force) {
+    this.acceleration.add(force);
+  }
+
+  update() {
+    // Euler integration
+    this.velocity.add(this.acceleration);
+    this.velocity.limit(MAX_SPEED);
+    this.position.add(this.velocity);
+    
+    // Reset acceleration
+    this.acceleration.mult(0);
+  }
+
+  edges() {
+    // Wrap around screen edges
+    if (this.position.x < 0) {
+      this.position.x = width;
+    } else if (this.position.x > width) {
+      this.position.x = 0;
+    }
+    
+    if (this.position.y < 0) {
+      this.position.y = height;
+    } else if (this.position.y > height) {
+      this.position.y = 0;
+    }
+  }
+
+  show() {
+    // Minimal rendering: point
+    point(this.position.x, this.position.y);
+  }
+}
