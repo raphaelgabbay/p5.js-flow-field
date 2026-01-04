@@ -25,14 +25,14 @@ class ParametersPanel {
     window.__uiInteractionActive = false;
     const activate = (e) => {
       window.__uiInteractionActive = true;
-      if (e && typeof e.stopPropagation === 'function') e.stopPropagation();
     };
     const deactivate = () => {
       window.__uiInteractionActive = false;
     };
-    this.container.addEventListener('pointerdown', activate, true);
-    this.container.addEventListener('mousedown', activate, true);
-    this.container.addEventListener('touchstart', activate, { capture: true, passive: true });
+    // IMPORTANT: don't stop propagation / don't capture, or sliders can become unresponsive
+    this.container.addEventListener('pointerdown', activate, false);
+    this.container.addEventListener('mousedown', activate, false);
+    this.container.addEventListener('touchstart', activate, { capture: false, passive: true });
     document.addEventListener('pointerup', deactivate, true);
     document.addEventListener('mouseup', deactivate, true);
     document.addEventListener('touchend', deactivate, true);

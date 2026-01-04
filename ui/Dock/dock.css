@@ -19,8 +19,8 @@ canvas {
   left: 50%;
   transform: translateX(-50%);
   z-index: 1000;
-  /* Allow the dock to reliably capture taps on mobile (avoid click-through to canvas) */
-  pointer-events: auto;
+  /* Keep click-through outside the actual dock container */
+  pointer-events: none;
   transition: opacity 0.3s ease, transform 0.3s ease;
 }
 
