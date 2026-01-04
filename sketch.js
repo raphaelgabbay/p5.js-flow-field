@@ -336,6 +336,15 @@ async function setup() {
     canvasElement.addEventListener('contextmenu', (e) => e.preventDefault());
     canvasElement.addEventListener('selectstart', (e) => e.preventDefault());
     canvasElement.addEventListener('dragstart', (e) => e.preventDefault());
+
+    // Hide parameters panel when tapping on the canvas (not when using sliders)
+    const hideParams = () => {
+      if (window.parametersPanel) window.parametersPanel.hide();
+    };
+    canvasElement.addEventListener('pointerdown', hideParams, true);
+    canvasElement.addEventListener('mousedown', hideParams, true);
+    canvasElement.addEventListener('touchstart', hideParams, { capture: true, passive: true });
+
     // Prevent scroll/zoom gestures starting on the canvas
     canvasElement.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false });
     canvasElement.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
@@ -492,6 +501,12 @@ async function setup() {
   
   // Initialize preset list
   PresetManager.updatePresetList();
+
+  // Always default to the Spawn/Add tool on page load
+  // (some GUI init flows can change active tool indirectly)
+  if (toolManager) {
+    toolManager.setActive('spawn');
+  }
   
   // Hide GUI by default
   if (gui && gui.domElement) {
@@ -545,13 +560,8 @@ function mousePressed() {
   fetch('http://127.0.0.1:7242/ingest/527a21af-eea1-4d95-9dc3-a47f1486fd47',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'sketch.js:495',message:'p5 mousePressed called',data:{mouseX:mouseX,mouseY:mouseY,button:mouseButton},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
   // #endregion
   
-  const e = arguments && arguments.length > 0 ? arguments[0] : null;
-  // Don't treat UI interactions as canvas input
-  if (isEventFromUI(e)) return;
-  if (!isEventOnCanvas(e)) return;
-  
-  // Hide parameters panel when clicking on canvas (not when adjusting UI)
-  if (window.parametersPanel) window.parametersPanel.hide();
+  // If the press started on UI overlays (sliders/buttons), ignore it
+  if (window.__uiInteractionActive) return;
   
   if (toolManager) {
     toolManager.handleMousePressed(world, {
@@ -566,9 +576,7 @@ function mouseDragged() {
   // #region agent log
   fetch('http://127.0.0.1:7242/ingest/527a21af-eea1-4d95-9dc3-a47f1486fd47',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'sketch.js:505',message:'p5 mouseDragged called',data:{mouseX:mouseX,mouseY:mouseY,button:mouseButton},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
   // #endregion
-  const e = arguments && arguments.length > 0 ? arguments[0] : null;
-  if (isEventFromUI(e)) return;
-  if (!isEventOnCanvas(e)) return;
+  if (window.__uiInteractionActive) return;
   if (toolManager) {
     toolManager.handleMouseDragged(world, {
       x: mouseX,
@@ -582,9 +590,7 @@ function mouseReleased() {
   // #region agent log
   fetch('http://127.0.0.1:7242/ingest/527a21af-eea1-4d95-9dc3-a47f1486fd47',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'sketch.js:515',message:'p5 mouseReleased called',data:{mouseX:mouseX,mouseY:mouseY,button:mouseButton},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
   // #endregion
-  const e = arguments && arguments.length > 0 ? arguments[0] : null;
-  if (isEventFromUI(e)) return;
-  if (!isEventOnCanvas(e)) return;
+  if (window.__uiInteractionActive) return;
   if (toolManager) {
     toolManager.handleMouseReleased(world, {
       x: mouseX,
@@ -596,10 +602,7 @@ function mouseReleased() {
 
 // Explicit touch forwarding so tools work on first touch (mobile)
 function touchStarted() {
-  const e = arguments && arguments.length > 0 ? arguments[0] : null;
-  if (isEventFromUI(e)) return false;
-  if (!isEventOnCanvas(e)) return false;
-  if (window.parametersPanel) window.parametersPanel.hide();
+  if (window.__uiInteractionActive) return false;
   if (toolManager) {
     toolManager.handleMousePressed(world, {
       x: mouseX,
@@ -611,9 +614,7 @@ function touchStarted() {
 }
 
 function touchMoved() {
-  const e = arguments && arguments.length > 0 ? arguments[0] : null;
-  if (isEventFromUI(e)) return false;
-  if (!isEventOnCanvas(e)) return false;
+  if (window.__uiInteractionActive) return false;
   if (toolManager) {
     toolManager.handleMouseDragged(world, {
       x: mouseX,
@@ -625,9 +626,7 @@ function touchMoved() {
 }
 
 function touchEnded() {
-  const e = arguments && arguments.length > 0 ? arguments[0] : null;
-  if (isEventFromUI(e)) return false;
-  if (!isEventOnCanvas(e)) return false;
+  if (window.__uiInteractionActive) return false;
   if (toolManager) {
     toolManager.handleMouseReleased(world, {
       x: mouseX,

@@ -19,6 +19,24 @@ class ParametersPanel {
     this.container = document.createElement('div');
     this.container.id = 'parameters-panel';
     document.body.appendChild(this.container);
+
+    // Mark UI interactions so p5 doesn't treat them as canvas presses
+    // (p5 mousePressed can still fire when interacting with DOM overlays on mobile)
+    window.__uiInteractionActive = false;
+    const activate = (e) => {
+      window.__uiInteractionActive = true;
+      if (e && typeof e.stopPropagation === 'function') e.stopPropagation();
+    };
+    const deactivate = () => {
+      window.__uiInteractionActive = false;
+    };
+    this.container.addEventListener('pointerdown', activate, true);
+    this.container.addEventListener('mousedown', activate, true);
+    this.container.addEventListener('touchstart', activate, { capture: true, passive: true });
+    document.addEventListener('pointerup', deactivate, true);
+    document.addEventListener('mouseup', deactivate, true);
+    document.addEventListener('touchend', deactivate, true);
+    document.addEventListener('touchcancel', deactivate, true);
     
     // Start hidden
     this.visible = false;
