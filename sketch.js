@@ -37,6 +37,45 @@ let presetLoadController;
 let presetNameInput = { name: 'Preset 1' };
 let toolManager;
 let uiManager;
+let canvasElement = null;
+let usePointerRouter = false;
+let pointerIsDown = false;
+let activePointerId = null;
+
+function getCanvasCoordsFromPointerEvent(e) {
+  if (!canvasElement || !e) {
+    return { x: mouseX, y: mouseY };
+  }
+  const rect = canvasElement.getBoundingClientRect();
+  const x = (e.clientX - rect.left) * (width / rect.width);
+  const y = (e.clientY - rect.top) * (height / rect.height);
+  return { x: x, y: y };
+}
+
+function isEventFromUI(e) {
+  const t = e && e.target ? e.target : null;
+  if (!t) return false;
+  const tag = (t.tagName || '').toUpperCase();
+  if (tag === 'INPUT' || tag === 'BUTTON' || tag === 'TEXTAREA' || tag === 'SELECT' || tag === 'OPTION' || tag === 'LABEL') {
+    return true;
+  }
+  // Walk up DOM tree to see if inside UI containers
+  let el = t;
+  while (el) {
+    if (el.id === 'tool-dock' || el.id === 'parameters-panel') return true;
+    // lil-gui root uses class "lil-gui"
+    if (el.classList && el.classList.contains('lil-gui')) return true;
+    el = el.parentElement;
+  }
+  return false;
+}
+
+function isEventOnCanvas(e) {
+  if (!canvasElement) return true;
+  const t = e && e.target ? e.target : null;
+  if (!t) return true;
+  return t === canvasElement;
+}
 
 // Preset management
 const PresetManager = {
@@ -297,15 +336,82 @@ const PresetManager = {
 
 async function setup() {
   // Create fullscreen canvas
-  createCanvas(windowWidth, windowHeight);
+  const canvas = createCanvas(windowWidth, windowHeight);
+  canvasElement = canvas && canvas.elt ? canvas.elt : null;
+  if (canvasElement) {
+    // Prefer pointer events router when available (more reliable on mobile overlays)
+    usePointerRouter = typeof window !== 'undefined' && typeof window.PointerEvent !== 'undefined';
+
+    // Prevent long-press callout/selection/gestures on mobile
+    canvasElement.style.userSelect = 'none';
+    canvasElement.style.webkitUserSelect = 'none';
+    canvasElement.style.webkitTouchCallout = 'none';
+    canvasElement.style.webkitUserDrag = 'none';
+    canvasElement.style.touchAction = 'none';
+
+    canvasElement.addEventListener('contextmenu', (e) => e.preventDefault());
+    canvasElement.addEventListener('selectstart', (e) => e.preventDefault());
+    canvasElement.addEventListener('dragstart', (e) => e.preventDefault());
+
+    // Hide parameters panel when tapping on the canvas (not when using sliders)
+    const hideParams = (e) => {
+      if (window.__uiInteractionActive) return;
+      if (e && isEventFromUI(e)) return;
+      if (window.parametersPanel) window.parametersPanel.hide();
+    };
+
+    // Route pointer input directly to the ToolManager (avoid p5 DOM overlay quirks on mobile)
+    if (usePointerRouter) {
+      const onPointerDown = (e) => {
+        if (window.__uiInteractionActive) return;
+        hideParams(e);
+        pointerIsDown = true;
+        activePointerId = e.pointerId;
+        const pos = getCanvasCoordsFromPointerEvent(e);
+        if (toolManager) {
+          toolManager.handleMousePressed(world, { x: pos.x, y: pos.y, button: LEFT });
+        }
+        e.preventDefault();
+      };
+      const onPointerMove = (e) => {
+        if (!pointerIsDown) return;
+        if (activePointerId !== null && e.pointerId !== activePointerId) return;
+        const pos = getCanvasCoordsFromPointerEvent(e);
+        if (toolManager) {
+          toolManager.handleMouseDragged(world, { x: pos.x, y: pos.y, button: LEFT });
+        }
+        e.preventDefault();
+      };
+      const onPointerUp = (e) => {
+        if (!pointerIsDown) return;
+        if (activePointerId !== null && e.pointerId !== activePointerId) return;
+        pointerIsDown = false;
+        activePointerId = null;
+        const pos = getCanvasCoordsFromPointerEvent(e);
+        if (toolManager) {
+          toolManager.handleMouseReleased(world, { x: pos.x, y: pos.y, button: LEFT });
+        }
+        e.preventDefault();
+      };
+
+      canvasElement.addEventListener('pointerdown', onPointerDown, { passive: false });
+      canvasElement.addEventListener('pointermove', onPointerMove, { passive: false });
+      canvasElement.addEventListener('pointerup', onPointerUp, { passive: false });
+      canvasElement.addEventListener('pointercancel', onPointerUp, { passive: false });
+    } else {
+      canvasElement.addEventListener('pointerdown', hideParams, true);
+      canvasElement.addEventListener('mousedown', hideParams, true);
+      canvasElement.addEventListener('touchstart', hideParams, { capture: true, passive: true });
+    }
+
+    // Prevent scroll/zoom gestures starting on the canvas
+    // (Don't block touchend, it can interfere with UI click synthesis on some mobile browsers.)
+    canvasElement.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false });
+    canvasElement.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
+  }
   
   // Set background color to black
   background(0);
-
-  // Prevent context menu on right click
-  document.addEventListener('contextmenu', (e) => {
-    e.preventDefault();
-  });
   
   // Initialize world
   world = new World();
@@ -454,6 +560,12 @@ async function setup() {
   
   // Initialize preset list
   PresetManager.updatePresetList();
+
+  // Always default to the Spawn/Add tool on page load
+  // (some GUI init flows can change active tool indirectly)
+  if (toolManager) {
+    toolManager.setActive('spawn');
+  }
   
   // Hide GUI by default
   if (gui && gui.domElement) {
@@ -507,10 +619,9 @@ function mousePressed() {
   fetch('http://127.0.0.1:7242/ingest/527a21af-eea1-4d95-9dc3-a47f1486fd47',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'sketch.js:495',message:'p5 mousePressed called',data:{mouseX:mouseX,mouseY:mouseY,button:mouseButton},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
   // #endregion
   
-  // Hide parameters panel when clicking on canvas
-  if (window.parametersPanel) {
-    window.parametersPanel.hide();
-  }
+  if (usePointerRouter) return;
+  // If the press started on UI overlays (sliders/buttons), ignore it
+  if (window.__uiInteractionActive) return;
   
   if (toolManager) {
     toolManager.handleMousePressed(world, {
@@ -522,9 +633,11 @@ function mousePressed() {
 }
 
 function mouseDragged() {
+  if (usePointerRouter) return;
   // #region agent log
   fetch('http://127.0.0.1:7242/ingest/527a21af-eea1-4d95-9dc3-a47f1486fd47',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'sketch.js:505',message:'p5 mouseDragged called',data:{mouseX:mouseX,mouseY:mouseY,button:mouseButton},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
   // #endregion
+  if (window.__uiInteractionActive) return;
   if (toolManager) {
     toolManager.handleMouseDragged(world, {
       x: mouseX,
@@ -535,9 +648,11 @@ function mouseDragged() {
 }
 
 function mouseReleased() {
+  if (usePointerRouter) return;
   // #region agent log
   fetch('http://127.0.0.1:7242/ingest/527a21af-eea1-4d95-9dc3-a47f1486fd47',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'sketch.js:515',message:'p5 mouseReleased called',data:{mouseX:mouseX,mouseY:mouseY,button:mouseButton},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
   // #endregion
+  if (window.__uiInteractionActive) return;
   if (toolManager) {
     toolManager.handleMouseReleased(world, {
       x: mouseX,
@@ -545,6 +660,55 @@ function mouseReleased() {
       button: mouseButton
     });
   }
+}
+
+// Explicit touch forwarding so tools work on first touch (mobile)
+function touchStarted() {
+  if (usePointerRouter) return false;
+  if (window.__uiInteractionActive) return false;
+  if (toolManager) {
+    const t = typeof touches !== 'undefined' && touches && touches.length > 0 ? touches[0] : null;
+    const x = t && typeof t.x === 'number' ? t.x : mouseX;
+    const y = t && typeof t.y === 'number' ? t.y : mouseY;
+    toolManager.handleMousePressed(world, {
+      x: x,
+      y: y,
+      button: LEFT
+    });
+  }
+  return false;
+}
+
+function touchMoved() {
+  if (usePointerRouter) return false;
+  if (window.__uiInteractionActive) return false;
+  if (toolManager) {
+    const t = typeof touches !== 'undefined' && touches && touches.length > 0 ? touches[0] : null;
+    const x = t && typeof t.x === 'number' ? t.x : mouseX;
+    const y = t && typeof t.y === 'number' ? t.y : mouseY;
+    toolManager.handleMouseDragged(world, {
+      x: x,
+      y: y,
+      button: LEFT
+    });
+  }
+  return false;
+}
+
+function touchEnded() {
+  if (usePointerRouter) return false;
+  if (window.__uiInteractionActive) return false;
+  if (toolManager) {
+    const t = typeof touches !== 'undefined' && touches && touches.length > 0 ? touches[0] : null;
+    const x = t && typeof t.x === 'number' ? t.x : mouseX;
+    const y = t && typeof t.y === 'number' ? t.y : mouseY;
+    toolManager.handleMouseReleased(world, {
+      x: x,
+      y: y,
+      button: LEFT
+    });
+  }
+  return false;
 }
 
 function keyPressed() {

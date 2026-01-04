@@ -9,6 +9,7 @@ class Dock {
     this.container = null;
     this.visible = true;
     this.activeToolId = null;
+    this._lastActivateTs = 0;
     
     // Bind methods
     this.handleToolClick = this.handleToolClick.bind(this);
@@ -27,6 +28,25 @@ class Dock {
     this.container = document.createElement('div');
     this.container.id = 'tool-dock';
     document.body.appendChild(this.container);
+
+    // Mark dock interactions as UI interactions so p5 doesn't treat them as canvas presses
+    if (typeof window.__uiInteractionActive === 'undefined') {
+      window.__uiInteractionActive = false;
+    }
+    const activate = (e) => {
+      window.__uiInteractionActive = true;
+    };
+    const deactivate = () => {
+      window.__uiInteractionActive = false;
+    };
+    // IMPORTANT: don't stop propagation / don't capture, or tool buttons won't receive taps
+    this.container.addEventListener('pointerdown', activate, false);
+    this.container.addEventListener('mousedown', activate, false);
+    this.container.addEventListener('touchstart', activate, { capture: false, passive: true });
+    document.addEventListener('pointerup', deactivate, true);
+    document.addEventListener('mouseup', deactivate, true);
+    document.addEventListener('touchend', deactivate, true);
+    document.addEventListener('touchcancel', deactivate, true);
     
     // Initial render
     this.render();
@@ -91,6 +111,33 @@ class Dock {
         }
       }
     }
+  }
+
+  /**
+   * Attach a mobile-friendly activation handler to an element.
+   * Uses pointer/touch/mouse events because mobile browsers can swallow "click"
+   * when touch defaults are prevented elsewhere (e.g. canvas).
+   */
+  bindActivate(element, handler) {
+    const fire = (e) => {
+      const now = Date.now();
+      // Avoid double-firing (touchend -> click, etc.)
+      if (now - this._lastActivateTs < 350) return;
+      this._lastActivateTs = now;
+      if (e) {
+        if (typeof e.preventDefault === 'function') e.preventDefault();
+        if (typeof e.stopPropagation === 'function') e.stopPropagation();
+      }
+      handler();
+    };
+
+    // Prefer Pointer Events if available
+    element.addEventListener('pointerup', fire, { passive: false });
+    // Fallbacks
+    element.addEventListener('touchend', fire, { passive: false });
+    element.addEventListener('mouseup', fire, { passive: false });
+    // Last resort
+    element.addEventListener('click', fire, { passive: false });
   }
 
   /**
@@ -235,7 +282,7 @@ class Dock {
       button.className = `dock-item ${tool.id === activeId ? 'active' : ''}`;
       button.title = `${tool.label} (${index + 1})`;
       button.setAttribute('data-tool-id', tool.id);
-      button.addEventListener('click', () => this.handleToolClick(tool.id));
+      this.bindActivate(button, () => this.handleToolClick(tool.id));
       
       const icon = document.createElement('i');
       icon.setAttribute('data-feather', tool.icon);
@@ -251,7 +298,7 @@ class Dock {
     // #region agent log
     fetch('http://127.0.0.1:7242/ingest/527a21af-eea1-4d95-9dc3-a47f1486fd47',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dock.js:230',message:'attaching click handler to settings button',data:{buttonExists:settingsButton !== null,thisBound:this !== null && this !== undefined},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
     // #endregion
-    settingsButton.addEventListener('click', () => {
+    this.bindActivate(settingsButton, () => {
       // #region agent log
       fetch('http://127.0.0.1:7242/ingest/527a21af-eea1-4d95-9dc3-a47f1486fd47',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dock.js:232',message:'settings button click event fired',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
       // #endregion
