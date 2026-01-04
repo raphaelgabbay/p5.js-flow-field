@@ -19,7 +19,8 @@ canvas {
   left: 50%;
   transform: translateX(-50%);
   z-index: 1000;
-  pointer-events: none;
+  /* Allow the dock to reliably capture taps on mobile (avoid click-through to canvas) */
+  pointer-events: auto;
   transition: opacity 0.3s ease, transform 0.3s ease;
 }
 
@@ -101,7 +102,8 @@ canvas {
   left: 50%;
   transform: translateX(-50%);
   z-index: 999;
-  pointer-events: none;
+  /* Allow the panel to reliably capture slider drags on mobile (avoid click-through) */
+  pointer-events: auto;
   transition: opacity 0.3s ease, transform 0.3s ease;
 }
 

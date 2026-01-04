@@ -27,6 +27,25 @@ class Dock {
     this.container = document.createElement('div');
     this.container.id = 'tool-dock';
     document.body.appendChild(this.container);
+
+    // Mark dock interactions as UI interactions so p5 doesn't treat them as canvas presses
+    if (typeof window.__uiInteractionActive === 'undefined') {
+      window.__uiInteractionActive = false;
+    }
+    const activate = (e) => {
+      window.__uiInteractionActive = true;
+      if (e && typeof e.stopPropagation === 'function') e.stopPropagation();
+    };
+    const deactivate = () => {
+      window.__uiInteractionActive = false;
+    };
+    this.container.addEventListener('pointerdown', activate, true);
+    this.container.addEventListener('mousedown', activate, true);
+    this.container.addEventListener('touchstart', activate, { capture: true, passive: true });
+    document.addEventListener('pointerup', deactivate, true);
+    document.addEventListener('mouseup', deactivate, true);
+    document.addEventListener('touchend', deactivate, true);
+    document.addEventListener('touchcancel', deactivate, true);
     
     // Initial render
     this.render();
