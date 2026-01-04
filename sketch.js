@@ -405,9 +405,9 @@ async function setup() {
     }
 
     // Prevent scroll/zoom gestures starting on the canvas
+    // (Don't block touchend, it can interfere with UI click synthesis on some mobile browsers.)
     canvasElement.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false });
     canvasElement.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
-    canvasElement.addEventListener('touchend', (e) => e.preventDefault(), { passive: false });
   }
   
   // Set background color to black

@@ -90,9 +90,7 @@ class ParametersPanel {
     
     this.activeTool = activeTool;
     // Show panel when tool changes
-    if (activeTool) {
-      this.visible = true;
-    }
+    if (activeTool) this.visible = true;
     this.render();
   }
 
