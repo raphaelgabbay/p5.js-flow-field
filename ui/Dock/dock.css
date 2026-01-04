@@ -3,6 +3,15 @@
  * macOS-inspired design with glassmorphism
  */
 
+/* Canvas: prevent text selection / long-press callout on mobile */
+canvas {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-user-drag: none;
+  touch-action: none;
+}
+
 /* Dock Container */
 #tool-dock {
   position: fixed;
