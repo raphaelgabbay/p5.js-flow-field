@@ -5,6 +5,10 @@
 
 /* Canvas: prevent text selection / long-press callout on mobile */
 canvas {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 0;
   -webkit-user-select: none;
   user-select: none;
   -webkit-touch-callout: none;
@@ -19,8 +23,9 @@ canvas {
   left: 50%;
   transform: translateX(-50%);
   z-index: 1000;
-  /* Keep click-through outside the actual dock container */
-  pointer-events: none;
+  /* On some mobile browsers, pointer-events:none can break child button taps */
+  pointer-events: auto;
+  touch-action: manipulation;
   transition: opacity 0.3s ease, transform 0.3s ease;
 }
 
@@ -43,6 +48,7 @@ canvas {
   border: 1px solid rgba(255, 255, 255, 0.1);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
   pointer-events: auto;
+  touch-action: manipulation;
 }
 
 /* Dock Items (Icons) */
@@ -61,6 +67,7 @@ canvas {
   padding: 0;
   margin: 0;
   color: rgba(255, 255, 255, 0.7);
+  touch-action: manipulation;
 }
 
 .dock-item:hover {
@@ -104,6 +111,7 @@ canvas {
   z-index: 999;
   /* Allow the panel to reliably capture slider drags on mobile (avoid click-through) */
   pointer-events: auto;
+  touch-action: manipulation;
   transition: opacity 0.3s ease, transform 0.3s ease;
 }
 
@@ -117,6 +125,7 @@ canvas {
   min-width: 280px;
   max-width: 400px;
   pointer-events: auto;
+  touch-action: manipulation;
   overflow: hidden;
 }
 
@@ -169,6 +178,8 @@ canvas {
   appearance: none;
   cursor: pointer;
   transition: background 0.2s;
+  /* Ensure horizontal drag works on mobile */
+  touch-action: pan-x;
 }
 
 #parameters-panel .param-slider:hover {

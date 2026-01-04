@@ -367,11 +367,6 @@ async function setup() {
         hideParams(e);
         pointerIsDown = true;
         activePointerId = e.pointerId;
-        try {
-          canvasElement.setPointerCapture(e.pointerId);
-        } catch (err) {
-          // Ignore (some browsers may throw)
-        }
         const pos = getCanvasCoordsFromPointerEvent(e);
         if (toolManager) {
           toolManager.handleMousePressed(world, { x: pos.x, y: pos.y, button: LEFT });
